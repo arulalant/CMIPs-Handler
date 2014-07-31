@@ -1,0 +1,3 @@
+Download html python module from https://pypi.python.org/pypi/html
+or $ easy_install html 
+or # /usr/local/uvcdat/[VERSION]/bin/easy_install html
