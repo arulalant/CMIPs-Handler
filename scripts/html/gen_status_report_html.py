@@ -9,7 +9,69 @@ from timeutils import TimeUtility
 
 timobj = TimeUtility()
 
+dirsize_chars = ['K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
 
+def __convert2BigSize(previous_dirsize, dirsize_no):
+    '''
+    previous_dirsize : must be string with human readable suffix
+    dirsize_no : must be in KBs float type
+    return : previous_dirsize + dirsize_no as string with human 
+             readable suffix
+    '''
+    
+    suffix = re.findall(r'[A-Z]', previous_dirsize)[0]
+    previous_dirsize_no = float(previous_dirsize.split(suffix)[0])        
+    suffix = suffix[0]        
+    # convert previous_dirsize_no into KBs
+    if suffix in dirsize_chars:
+        power = dirsize_chars.index(suffix)
+        if power: # i.e > 0
+            # convert bigsize into KBs
+            previous_dirsize_no *= (1024 ** power)
+    # end of if suffix in dirsie_chars:
+    
+    # add previous_dirsize_no and dirsize_no (both are in KBs)        
+    current_size_no = previous_dirsize_no + dirsize_no
+    
+    # convert current_size_no into string with human readable suffix
+    power = 0
+    while (current_size_no > 1024):
+        current_size_no /= 1024.
+        power += 1
+        if power == 7: break # i.e. going beyond dirsize_chars length
+    # end of while (current_size_no > 1024):
+    suffix = dirsize_chars[power]
+    current_size = str(current_size_no) + ' ' + suffix + 'B'
+    # return current_size
+    return current_size
+# end of def __convert2BigSize(previous_dirsize, dirsize_no):
+
+
+def __getSizeInKBs(dirsize):
+    '''
+    Input : dirsize in string with human readable suffix 
+    
+    returns : tuple contains dirsize_no in float KBs and 
+              dirsize in string with human readable suffix 
+    
+    '''
+    
+    suffix = re.findall(r'[A-Z]', dirsize)[0]
+    dirsize_no = dirsize.split(suffix)[0]
+    # current dirsize in string with human readable suffix
+    dirsize = dirsize_no + ' ' + suffix + 'B'
+    # convert current dirsize into KBs float 
+    dirsize_no = float(dirsize_no)
+    if suffix in dirsize_chars:
+        power = dirsize_chars.index(suffix)
+        if power: # i.e > 0
+            # convert big size into KBs
+            dirsize_no *= (1024 ** power)
+    # end of if suffix in dirsie_chars:
+    return (dirsize_no, dirsize)
+# end of def __getSizeInKBs(dirsize):
+                
+                
 def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                  collectxml=0, has_missing_taxis=0, get_missing_taxis=0):
     """
@@ -46,12 +108,18 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
 
     # tdic = {experiment: {frequency: {model: {ensemble: {realm: {varname: 'least-dir-size'}}}}}}
     tdic = {}
-
+    
+    # esize = {experiment: {frequency: {model: {ensemble: 'full-size-of-all-variables-of-all-realms'}}}}
+    esize = {}
+    # vsize = {experiment: {frequency: {varname: 'full-size-of-all-realms-of-all-models'}}}
+    vsize = {}
+    
     datappath = os.path.join(datapath, project)
     # list out the all available model names from the 1st level directory
     # structure
     Model_list = os.listdir(datappath)
-    errf = open('error_files.txt', 'w')
+    errf = open('error_files.txt', 'w')    
+
     for root, sub, files in os.walk(datappath):
 
         # removing the skip directories without visting
@@ -76,8 +144,14 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                 tdic[experiment] = {}
                 # assign the experiment as 1st-level dictionary-key in vardic.
                 vardic[experiment] = {}
+                # assign the experiment as 1st-level dictionary-key in esize.
+                esize[experiment] = {}
+                # assign the experiment as 1st-level dictionary-key in vsize.
+                vsize[experiment] = {}
             # end of if not experiment in tdic:
             expdic = tdic[experiment]
+            exp_es_dic = esize[experiment]
+            exp_vs_dic = vsize[experiment]
 
         elif dirname in Freq.values():
             # get the frequency name
@@ -85,13 +159,23 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
             if not frequency in expdic:
                 # assign the frequency as 2nd-level dictionary-key in tdic.
                 expdic[frequency] = {}
+                # assign the frequency as 2nd-level dictionary-key in esize.
+                exp_es_dic[frequency] = {}
+                # assign the frequency as 2nd-level dictionary-key in vsize.
+                exp_vs_dic[frequency] = {}
             # end of if not frequency in expdic:
             fredic = expdic[frequency]
+            fre_es_dic = exp_es_dic[frequency]
+            fre_vs_dic = exp_vs_dic[frequency]
             if not model in fredic:
                 # assign the model as 3rd-level dictionary-key in tdic.
                 fredic[model] = {}
+                # assign the model as 3rd-level dictionary-key in esize.
+                fre_es_dic[model] = {}
             # end of if not model in fredic:
             modeldic = fredic[model]
+            # store all the full-size-of-all-variables-of-all-realms here
+            model_es_dic = fre_es_dic[model]
 
         elif dirname in Realm.values():
             # get the realm name
@@ -107,7 +191,7 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
             ensemble = dirname
             if not ensemble in modeldic:
                 # assign the ensemble as 4th-level dictionary-key in tdic.
-                modeldic[ensemble] = {}
+                modeldic[ensemble] = {}                
             # end of if not ensemble in modeldic:
             ensdic = modeldic[ensemble]
             if not realm in ensdic:
@@ -122,21 +206,45 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
         
         if files and (not sub):
             leastValue = None
-
+            
             # ensure that reached the least node/sub directory.
             # get the current directory size as human readable.
             fobj = os.popen("du -sh '%s' " % root)
             dirsize = fobj.readlines()[-1].split()[0]
             if dirsize == '0':
-                dirsize = '0 B'
+                dirsize = '0 B'                
+                dirsize_no = 0
             else:
-                suffix = re.findall(r'[A-Z]', dirsize)[0]
-                dirsize = dirsize.split(suffix)[0] + ' ' + suffix + 'B'
+                dirsize_no, dirsize = __getSizeInKBs(dirsize)               
             # end of if dirsize == '0':
 
             # assign the dirsize to the leastValue var.
             leastValue = dirsize
-
+            
+            if ensemble not in model_es_dic:
+                # assign dirsize in string with human readable suffix
+                model_es_dic[ensemble] = dirsize                
+            else:
+                previous_dirsize = model_es_dic[ensemble]
+                # add previous and current dirsize & convert it into string
+                # with human readable suffix
+                current_size = __convert2BigSize(previous_dirsize, dirsize_no)
+                # store updated full ensemble size 
+                model_es_dic[ensemble] = current_size
+            # end of if ensemble not in model_es_dic:
+             
+            if varname not in fre_vs_dic:
+                # assign dirsize in string with human readable suffix
+                fre_vs_dic[varname] = dirsize
+            else:   
+                previous_dirsize = fre_vs_dic[varname]
+                # add previous and current dirsize & convert it into string
+                # with human readable suffix
+                current_size = __convert2BigSize(previous_dirsize, dirsize_no)
+                # store updated all variable size 
+                fre_vs_dic[varname] = current_size
+            # end of if varname not in fre_vs_dic:
+            
             if collectxml:
                 xmlfile = [f for f in files if f.endswith('.xml')]
                 if xmlfile:
@@ -195,16 +303,16 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                 realmdic[varname] = leastValue
             # end of if not varname in realmdic:
             # add the variable name to the set() of realm key in
-            # vardic[experiment].
+            # vardic[experiment].            
             vardic[experiment][realm].add(varname)
         # end of if files and (not sub):        
     # end of for root, sub, files in os.walk(datapath):
     errf.close()
-    return tdic, vardic
+    return (tdic, vardic, esize, vsize)
 # end of getDictOfProjDataStruct(project, ...):
 
 
-def genHtmlHeader(project='', csspath="css/data.css", js='js/data.js'):
+def genHtmlHeader(project='', location='', csspath="css/data.css", js='js/data.js'):
     # created index object from HTML() class which should create open & close tags
     html = HTML('html')
     head = html.head()
@@ -222,20 +330,21 @@ def genHtmlHeader(project='', csspath="css/data.css", js='js/data.js'):
     #load.text("Loading . . .")
     b.br
     heading = b.div(name='heading', klass='headingCls')
+    ifen = ' - ' if location else ''
     if project:
-        heading.h1(project + ' Project Data Report Sheet')
+        heading.h1(project + ' Project Data Report Sheet' + ifen + location)
     else:
-        heading.h1(' Project Index Data Report Sheet')
+        heading.h1(' Project Index Data Report Sheet' + ifen + location)
 
     form = b.form()
     tdiv = form.div(id="contentdiv")
     return (html, b, tdiv, form)
-# end of def genHtmlHeader(project='', csspath="css/data.css", js='js/data.js'):
+# end of def genHtmlHeader(project='', ...):
 
 
-def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
-                       xmlNotExistsWarning=0, xmlTAxisMissingWaring=0,
-                                                showXmlTAxisMissing=0):
+def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic, 
+                varSizeDic, latestPath, archiveDir, xmlNotExistsWarning=0, 
+                        xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
     """
 
 
@@ -243,7 +352,7 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
     Future Enhancement :-
     --------------------
 
-    project is single string as of now.
+    Argument 'project' is single string as of now.
     But in future we have to change this as list.
 
     Already we designed this function to generate the index and sub html pages
@@ -286,7 +395,7 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
     experiments.sort()
 
     # get the index html page table div for all the project index table
-    idx_html, idx_b, idx_tdiv, idx_form = genHtmlHeader()
+    idx_html, idx_b, idx_tdiv, idx_form = genHtmlHeader(location=location)
     idx_t = idx_tdiv.table(border='1', klass='tableCls')
     idx_r = idx_t.tr(klass="idxHeaderCls")
     idx_r.th(" S. No. ")
@@ -329,13 +438,13 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
         expvardic = vardic[experiment]
 
         avlrealms = []
-        # first 3 column (s.no, model, run)
-        totalcol = 3
+        # first 3 column (s.no, model, run) and last 1 column for total size
+        totalcol = 4
         # get the remaining var column count
         for realm in expvardic:
             totalcol += len(expvardic[realm])
             avlrealms.append(realm)
-        # end of for realm in expvardic:
+        # end of for realm in expvardic:       
         avlrealms.sort()
 
         # sort the frequencies
@@ -345,7 +454,7 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
         for frequency in frequencies:
             # new html page for each experiment & each frequency
             proj_html, proj_b, proj_tdiv, proj_form = genHtmlHeader(project,
-                                       csspath="../../css/data.css", js=None)
+                            location, csspath="../../css/data.css", js=None)
 
             t = proj_tdiv.table(border='1', klass='tableCls')
             r = t.tr
@@ -354,8 +463,8 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
 
             r = t.tr(klass="secondHeaderRowCls")
             r.th("Frequency = " + frequency, rowspan="2", colspan="3")
-            r.th("Variables", colspan=str(totalcol - 3))
-
+            r.th("Variables", colspan=str(totalcol - 4))
+            r.th("Run Total Size", rowspan="3")
             # next row
             r = t.tr(klass="secondHeaderRowCls")
             # write realm names in the table header
@@ -369,15 +478,15 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
             r = t.tr(klass="finalHeaderRowCls")
             r.th("S. No.")
             r.th("Model")
-            r.th("Run/ Realization")
-
+            r.th("Run/ Realization")            
+            
             # write variable names in the table header subset of realm header
             for realm in avlrealms:
                 avlvars = list(expvardic[realm])
                 avlvars.sort()
                 expvardic[realm] = avlvars
                 for varname in expvardic[realm]:
-                    r.th(varname)
+                    r.th(varname)                    
                 # end of for varname in expvardic[realm]:
             # end of for realm in avlrealms:
 
@@ -456,16 +565,70 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
                             # end of if myCls and myTitle:
                         # end of for varname in expvardic[realm]:
                     # end of for realm in expvardic:
-
+                    totTitle = model + ' ' + ensemble + ' Total Size'
+                    # add total size of total ensemble at last of column 
+                    # of the table
+                    if ensemble in ensSizeDic[experiment][frequency][model]:
+                        esize = ensSizeDic[experiment][frequency][model][ensemble]
+                        suffix = re.findall(r'[A-Z]', esize)[0]
+                        esize_no = float(esize.split(suffix)[0])
+                        # current dirsize in string with human readable suffix
+                        esize = str(round(esize_no, 2))
+                        if esize.endswith('.0'): esize = esize.split('.0')[0]     
+                        esize += ' ' + suffix + 'B'                        
+                        r.td(esize, klass='ensembleTotal', title=totTitle)
+                    else:
+                        # why ensemble comes in models when really not 
+                        # present there ???
+                        r.td('0 KB', klass='zeroByteWarningCls', title=totTitle)
+                    # end of if ensemble in ensSizeDic[...]:
+                    
+                    # adding empty cell for same model but different ensemble
                     if ensemble != avlensembles[-1]:
                         # empty sno, empty model name (because same model)
                         r = t.tr(klass=rcls)
                         r.td()
                         r.td()
                     # end of if ensemble != avlensembles[-1]:
+                    
                 # end of for ensemble in avlensembles:
             # end of for model in models:
-        # add the frequency to the index page
+            r = t.tr(klass='')
+            r.td('Variable Total Size', colspan="3", klass='varTotalSize')
+            GrandTotal = None
+            for realm in avlrealms:
+                for varname in expvardic[realm]:
+                    if not varname in varSizeDic[experiment][frequency]: continue        
+                    vsize = varSizeDic[experiment][frequency][varname]                                        
+                    if not GrandTotal: 
+                        GrandTotal = vsize
+                    else:
+                        vsize_no, vsize = __getSizeInKBs(vsize)
+                        # add total with previous total 
+                        GrandTotal = __convert2BigSize(GrandTotal, vsize_no)
+                    # end of if not GrandTotal: 
+                    # round off size 
+                    suffix = re.findall(r'[A-Z]', vsize)[0]
+                    vsize_no = float(vsize.split(suffix)[0])
+                    # current dirsize in string with human readable suffix
+                    vsize = str(round(vsize_no, 2))
+                    if vsize.endswith('.0'): vsize = vsize.split('.0')[0]                    
+                    vsize += ' ' + suffix + 'B'
+                    # add variable full size over all models
+                    myTitle = varname + ' Total Size'
+                    r.td(vsize, klass='variableTotal', title=myTitle)
+                # end of for varname in expvardic[realm]:
+            # end of for realm in avlrealms:
+            
+            # GrandTotal sum all together.
+            suffix = re.findall(r'[A-Z]', GrandTotal)[0]
+            GrandTotal_no = float(GrandTotal.split(suffix)[0])
+            # current dirsize in string with human readable suffix
+            GrandTotal = str(round(GrandTotal_no, 2)) + ' ' + suffix + 'B'
+            gtitle = 'GrandTotal of ' + experiment
+            r.td(GrandTotal, klass='GrandTotal', title=gtitle)
+        # end of for frequency in frequencies:
+        
         # add the footer to the project page
         foot = proj_b.div(id='footDiv')
         foot.text('Table Created On ' + strctime)
@@ -522,18 +685,20 @@ def genHtmlProjectTable(project, tdic, vardic, latestPath, archiveDir,
 # end of def genHtmlProjectTable(project, ...):
 
 
-def main(datapath, outpath, project='CMIP5', cdscanWarning=0,
-              xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
+def main(datapath, outpath, project='CMIP5', location='', cdscanWarning=0,
+                            xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
 
     outpath = os.path.join(outpath, 'CMIPs_Data_Status_Report')
     latestPath = os.path.join(outpath, 'latest')
-
+    print "Collecting info about available models, ensembles, variables, files & more"
+    print "Be hold ...!"
     # get the both available dataset structure & available vardic as dictionary
-    tableDic, varDic = getDictOfProjDataStruct(project, datapath,
-                                        collectxml=cdscanWarning,
-                          has_missing_taxis=xmlTAxisMissingWaring,
-                            get_missing_taxis=showXmlTAxisMissing)
-
+    tableDic, varDic, ensSizeDic, varSizeDic = getDictOfProjDataStruct(project, 
+                                        datapath, collectxml=cdscanWarning,
+                                   has_missing_taxis=xmlTAxisMissingWaring,
+                                     get_missing_taxis=showXmlTAxisMissing)
+    
+    print "Creating html table ..."
     # cleanup the previous latest folder
     htmlcrdate = ''
     if os.path.isdir(latestPath):
@@ -550,9 +715,9 @@ def main(datapath, outpath, project='CMIP5', cdscanWarning=0,
     # end of if os.path.isdir(latestPath):
 
     # generate the index & sub html pages and write it into proper directory
-    genHtmlProjectTable(project, tableDic, varDic, latestPath, htmlcrdate,
-                                     cdscanWarning, xmlTAxisMissingWaring,
-                                                      showXmlTAxisMissing)
+    genHtmlProjectTable(project, location, tableDic, varDic, ensSizeDic,
+                          varSizeDic, latestPath, htmlcrdate, cdscanWarning, 
+                               xmlTAxisMissingWaring, showXmlTAxisMissing)
 
     for folder in os.listdir(outpath):
         if folder in ['latest', htmlcrdate]:
@@ -581,7 +746,8 @@ def main(datapath, outpath, project='CMIP5', cdscanWarning=0,
 
 
 if __name__ == '__main__':
-
+    
+    location = raw_input("Enter the location name [CAS, IITD] : ") 
     project = raw_input("Enter the project name [CMIP5] : ")
     #datapath = raw_input("Enter the source project path : ")
     # Since this script is in server, it should know the source path !
@@ -598,7 +764,11 @@ if __name__ == '__main__':
     if project in ['CMIP5', '']:
         project = 'CMIP5'
     # end of if project in ['CMIP5', '']:
-
+    
+    if location in ['CAS, IITD', '']:
+        location = 'CAS, IITD'
+    # end of if location in ['CAS, IITD', '']:
+    
     if outpath in ['', None]:
         outpath = os.path.abspath(os.curdir)
     # end of if outpath in ['', None]:
@@ -632,7 +802,7 @@ if __name__ == '__main__':
     # end of if missing in ['y', 'Y', 'yes']:
 
     # call the main function
-    main(datapath, outpath, project, cdscanWarning=cdwarn,
+    main(datapath, outpath, project, location, cdscanWarning=cdwarn,
          xmlTAxisMissingWaring=missing, showXmlTAxisMissing=get_missing)
 
 # end of if __name__ == '__main__':
