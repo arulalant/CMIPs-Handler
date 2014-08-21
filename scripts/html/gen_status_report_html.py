@@ -664,12 +664,13 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
         if not IdxGrandTotal:
             IdxGrandTotal = GrandTotal
         else:
-            IdxGrandTotal_no, IdxGrandTotal = __getSizeInKBs(IdxGrandTotal)
+            # get current grand total no and str 
+            IdxGrandTotal_no, IdxGrandTotal_str = __getSizeInKBs(GrandTotal)
             # add total with previous total 
-            IdxGrandTotal = __convert2BigSize(IdxGrandTotal, IdxGrandTotal_no)                        
-            suffix = re.findall(r'[A-Z]', IdxGrandTotal)[0]
-            IdxGrandTotal_no = float(IdxGrandTotal.split(suffix)[0])
-            # current dirsize in string with human readable suffix
+            IdxGrandTotal_str = __convert2BigSize(IdxGrandTotal, IdxGrandTotal_no)                        
+            suffix = re.findall(r'[A-Z]', IdxGrandTotal_str)[0]
+            IdxGrandTotal_no = float(IdxGrandTotal_str.split(suffix)[0])
+            # current grand total in string with human readable suffix
             IdxGrandTotal = str(round(IdxGrandTotal_no, 2)) + ' ' + suffix + 'B'        
         # end of for frequency in frequencies:        
     # end of for experiment in experiments:
