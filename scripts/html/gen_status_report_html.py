@@ -3,6 +3,7 @@ import re
 import time
 from html import HTML
 from projectdatatypes import *
+from projectdatatypes_auto import all_experiments, all_ensembles
 from readHtml import getDateFromHtml
 from timeutils import TimeUtility
 
@@ -136,7 +137,7 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
             # get the model name
             model = dirname
 
-        elif dirname in Exp_list:
+        elif dirname in Exp_list + list(all_experiments):
             # get the experiment name
             experiment = dirname
             if not experiment in tdic:
@@ -186,7 +187,7 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                 vardic[experiment][realm] = set()
             # end of if not realm in vardic[experiment]:
 
-        elif dirname in Ensemble_list:
+        elif dirname in Ensemble_list + list(all_ensembles):
             # get the ensemble name
             ensemble = dirname
             if not ensemble in modeldic:
@@ -402,6 +403,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
     idx_r.th(" Project ")
     idx_r.th(" Experiment ")
     idx_r.th(" Frequency ")
+    idx_r.th(" Total Size")
     # need to increment through project loop
     idx_sno = 1
 
@@ -412,7 +414,8 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
     latestdirctime = time.strftime('%Y%m%d%H%M', time.localtime(tsec))
     # Below string format gives as like '2012-09-04 16:37'
     strctime = time.strftime('%Y-%m-%d %H:%M', time.localtime(tsec))
-
+    # store index page grand total 
+    IdxGrandTotal = 0
     for experiment in experiments:
         # create the experiment directory to save each experiment, frequency html
         # page inside that.
@@ -431,7 +434,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
             idx_r.td(str(idx_sno))
             idx_r.td(project)
         # end of if preproject == project:
-        idx_r.td(experiment)
+        idx_r.td(experiment)        
         preproject = project
 
         # get the experiment var dictionary of vardic
@@ -653,8 +656,28 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
         proj_page_link = os.path.join(project, experiment, proj_page_name)
         proj_link = idx_freq.a(href=proj_page_link, target='_blank', klass='')
         proj_link.text(frequency)
-        # end of for frequency in frequencies:
+        
+        # add experiment's GrandTotal into index page at last column
+        gTitle = ' '.join([project, experiment, frequency, 'Total Size'])
+        idx_r.td(GrandTotal, klass='ensembleTotal', title=gTitle)
+        # find index grand total 
+        if not IdxGrandTotal:
+            IdxGrandTotal = GrandTotal
+        else:
+            IdxGrandTotal_no, IdxGrandTotal = __getSizeInKBs(IdxGrandTotal)
+            # add total with previous total 
+            IdxGrandTotal = __convert2BigSize(IdxGrandTotal, IdxGrandTotal_no)                        
+            suffix = re.findall(r'[A-Z]', IdxGrandTotal)[0]
+            IdxGrandTotal_no = float(IdxGrandTotal.split(suffix)[0])
+            # current dirsize in string with human readable suffix
+            IdxGrandTotal = str(round(IdxGrandTotal_no, 2)) + ' ' + suffix + 'B'        
+        # end of for frequency in frequencies:        
     # end of for experiment in experiments:
+    # add grand total row and col at the end of the index page table 
+    idx_lr = idx_t.tr(klass=idx_rcls)
+    idx_lr.td('Grand Total Size', colspan="4", klass='varTotalSize')
+    igtitle = 'GrandTotal of ' + project
+    idx_lr.td(IdxGrandTotal, klass='GrandTotal', title=igtitle)
 
     foot = idx_form.div(id='footDiv')
     footp = foot.p(id='crdate', name=latestdirctime)
