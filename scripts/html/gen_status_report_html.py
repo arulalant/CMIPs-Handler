@@ -627,7 +627,9 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
             suffix = re.findall(r'[A-Z]', GrandTotal)[0]
             GrandTotal_no = float(GrandTotal.split(suffix)[0])
             # current dirsize in string with human readable suffix
-            GrandTotal = str(round(GrandTotal_no, 2)) + ' ' + suffix + 'B'
+            GrandTotal = str(round(GrandTotal_no, 2))
+            if GrandTotal.endswith('.0'): GrandTotal = GrandTotal.split('.0')[0]
+            GrandTotal += ' ' + suffix + 'B'
             gtitle = 'GrandTotal of ' + experiment
             r.td(GrandTotal, klass='GrandTotal', title=gtitle)
         # end of for frequency in frequencies:
@@ -674,7 +676,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
             IdxGrandTotal = str(round(IdxGrandTotal_no, 2)) + ' ' + suffix + 'B'        
         # end of for frequency in frequencies:        
     # end of for experiment in experiments:
-    # add grand total row and col at the end of the index page table 
+    # add grand total row and col at the end of the index page table     
     idx_lr = idx_t.tr(klass=idx_rcls)
     idx_lr.td('Grand Total Size', colspan="4", klass='varTotalSize')
     igtitle = 'GrandTotal of ' + project
