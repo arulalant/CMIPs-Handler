@@ -56,8 +56,8 @@ def createProjectList(datapath, project='CMIP5'):
             # end of for freq in freqs:
         # end of for experiment in experiments:
     # end of for model in all_models:
-
-    f = open(project + '_Dataset_List.py', 'w')
+    fname = project + '_Dataset_List.py'
+    f = open(fname, 'w')
     docstr = """
     project : %s
     info : It contains all the available models, experiments,
@@ -81,7 +81,9 @@ def createProjectList(datapath, project='CMIP5'):
     f.write("all_ensembles = " + repr(set(all_ensembles)))
     f.write("\n\n")
     f.close()
-    print "Created %s_Dataset_List.py which contains all the avilable list into it" % project
+    print "Created %s which contains all the avilable list into it" % fname
+    os.system("cp %s %s" % (fname, '../html/projectdatatypes_auto.py'))
+    print "Also copied the same into '../html/projectdatatypes_auto.py'"
 # end of def createProjectList(datapath, project='CMIP5'):
 
 if __name__ == '__main__':
