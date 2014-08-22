@@ -35,8 +35,9 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
 
     if not os.path.isabs(inpath):
         inpath = os.path.abspath(inpath)
-       
-    fobj = open('cpstatus.csv', 'w')
+    
+    cpstatus = os.path.join(outpath, 'cpstatus.csv')
+    fobj = open(cpstatus, 'w')
     
     if outpath in [None, '']:            
         raise ValueError("Outpath is None. So you can not copy the files in to the same \
@@ -141,11 +142,12 @@ if __name__ == '__main__':
 
     skip = raw_input("Enter the skip file extension : ")
     
-    f = open('done.log', 'w')
+    done = os.path.join(destpath, 'cp_done.log')
+    f = open(done, 'w')
     f.write("move started at %s \n\n" % str(time.ctime()))
     f.close()
     copyFilesFromProperDir(project, srcpath, destpath, overwrite, skip=skip)
-    f = open('done.log', 'a')
+    f = open(done, 'a')
     f.write("move finished at %s \n\n" % str(time.ctime()))
     f.close()
 
