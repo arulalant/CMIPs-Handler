@@ -38,6 +38,7 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
     
     cpstatus = os.path.join(outpath, 'cpstatus.csv')
     fobj = open(cpstatus, 'w')
+    print "Copy status will be going to store ", cpstatus
     
     if outpath in [None, '']:            
         raise ValueError("Outpath is None. So you can not copy the files in to the same \
@@ -114,6 +115,7 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
         # end of for subdir in sub:
     # end of for root, sub, files in os.walk(os.path.abspath(inpath)):         
     fobj.close()
+    
     print "\n\nDone ... !"
 # end of def def moveFiles2ProperDir(...):
 
@@ -143,6 +145,7 @@ if __name__ == '__main__':
     skip = raw_input("Enter the skip file extension : ")
     
     done = os.path.join(destpath, 'cp_done.log')
+    print "done status will be going to store ", done
     f = open(done, 'w')
     f.write("move started at %s \n\n" % str(time.ctime()))
     f.close()
