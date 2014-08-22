@@ -36,8 +36,7 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
     if not os.path.isabs(inpath):
         inpath = os.path.abspath(inpath)
     
-    cpstatus = os.path.join(outpath, 'cpstatus.csv')
-    fobj = open(cpstatus, 'w')
+    cpstatus = os.path.join(outpath, 'cpstatus.csv')    
     print "Copy status will be going to store ", cpstatus
     
     if outpath in [None, '']:            
@@ -94,10 +93,11 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
             if len(sub) > 0:
                 if sub[0] in usr_vars:
                     # copy the whole directories into destination
-                    rpath = root.split(project)[1][1:]                    
+                    rpath = root.split(project)[1][1:]                           
                     for vardir in sub:
                         varpath = os.path.join(root, vardir)
                         print "copying going on ...,", varpath
+                        fobj = open(cpstatus, 'a')
                         for run in os.listdir(varpath):
                             despath = os.path.join(outpath, rpath, run)
                             os.system('mkdir -p %s' % despath)
@@ -111,8 +111,9 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
                                 msg = '%s, is copied to, %s\n' % (lfilepath, despath)
                                 fobj.write(msg + '\n')
                                 print msg
-                            # end of for lfile in runpath:
+                            # end of for lfile in runpath:                            
                         # end of for run in os.listdir(varpath):
+                        fobj.close()
                     # end of for vardir in usr_vars:
                 # end of if sub[0] in usr_vars:
             # end of if len(sub) > 0:
@@ -120,9 +121,7 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
             continue
             # end of if subdir in all_models:
         # end of for subdir in sub:
-    # end of for root, sub, files in os.walk(os.path.abspath(inpath)):         
-    fobj.close()
-    
+    # end of for root, sub, files in os.walk(os.path.abspath(inpath)):      
     print "\n\nDone ... !"
 # end of def def moveFiles2ProperDir(...):
 
@@ -133,6 +132,9 @@ if __name__ == '__main__':
         
     destpath = raw_input("Enter the destination path : ")
     
+    if destpath in ['', '/']:
+        raise ValueError("destination path can not be empty or /")
+        
     if srcpath == destpath:
         raise ValueError("Both data sourcepath & destination path can not be same.")
     # end of if srcpath == destpath:
