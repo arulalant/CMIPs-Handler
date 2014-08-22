@@ -94,18 +94,25 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
             if len(sub) > 0:
                 if sub[0] in usr_vars:
                     # copy the whole directories into destination
-                    rpath = root.split(project)[1][1:]
-                    despath = os.path.join(outpath, rpath)
-                    os.system('mkdir -p %s' % despath)
-                    msg =  "destination path created '%s'\n" % despath
-                    fobj.write(msg)
-                    print msg
+                    rpath = root.split(project)[1][1:]                    
                     for vardir in sub:
                         varpath = os.path.join(root, vardir)
-                        os.system("cp -r %s %s" % (varpath, despath))
-                        msg = "copied %s to %s\n" % (varpath, despath)
-                        fobj.write(msg)
-                        print msg
+                        print "copying going on ...,", varpath
+                        for run in os.listdir(varpath):
+                            despath = os.path.join(outpath, rpath, run)
+                            os.system('mkdir -p %s' % despath)
+                            msg =  "destination path created, '%s'\n" % despath
+                            fobj.write(msg)
+                            print msg
+                            runpath = os.path.join(varpath, run)
+                            for lfile in os.listdir(runpath):
+                                lfilepath = os.path.join(runpath, lfile)
+                                shutil.copy2(lfilepath, despath)
+                                msg = '%s, is copied to, %s\n' % (lfilepath, despath)
+                                fobj.write(msg + '\n')
+                                print msg
+                            # end of for lfile in runpath:
+                        # end of for run in os.listdir(varpath):
                     # end of for vardir in usr_vars:
                 # end of if sub[0] in usr_vars:
             # end of if len(sub) > 0:
