@@ -154,10 +154,10 @@ if __name__ == '__main__':
     done = os.path.join(destpath, 'cp_done.log')
     print "done status will be going to store ", done
     f = open(done, 'w')
-    f.write("move started at %s \n\n" % str(time.ctime()))
+    f.write("copy started at %s \n\n" % str(time.ctime()))
     f.close()
     copyFilesFromProperDir(project, srcpath, destpath, overwrite, skip=skip)
     f = open(done, 'a')
-    f.write("move finished at %s \n\n" % str(time.ctime()))
+    f.write("copy finished at %s \n\n" % str(time.ctime()))
     f.close()
 
