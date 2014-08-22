@@ -83,7 +83,9 @@ def createProjectList(datapath, project='CMIP5'):
     f.close()
     print "Created %s which contains all the avilable list into it" % fname
     os.system("cp %s %s" % (fname, '../html/projectdatatypes_auto.py'))
-    print "Also copied the same into '../html/projectdatatypes_auto.py'"
+    print "copied the same into '../html/projectdatatypes_auto.py'"
+    os.system("cp %s %s" % (fname, '../mv/projectdatatypes_auto.py'))
+    print "Also copied the same into '../mv/projectdatatypes_auto.py'"
 # end of def createProjectList(datapath, project='CMIP5'):
 
 if __name__ == '__main__':
