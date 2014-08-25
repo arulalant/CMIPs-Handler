@@ -99,7 +99,7 @@ def copyFilesFromProperDir(project, inpath, outpath, overwrite=1,
                         print "copying going on ...,", varpath
                         fobj = open(cpstatus, 'a')
                         for run in os.listdir(varpath):
-                            despath = os.path.join(outpath, rpath, run)
+                            despath = os.path.join(outpath, rpath, vardir, run)
                             os.system('mkdir -p %s' % despath)
                             msg =  "destination path created, '%s'\n" % despath
                             fobj.write(msg)
