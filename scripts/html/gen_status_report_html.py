@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import time
@@ -74,10 +75,15 @@ def __getSizeInKBs(dirsize):
                 
                 
 def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
-                 collectxml=0, has_missing_taxis=0, get_missing_taxis=0):
+                           get_taxis=0, get_grid=0, collectxml=0, 
+                          has_missing_taxis=0, get_missing_taxis=0):
     """
     path - source directory path
-
+    
+    get_taxis - option 1 enable to return time axis begin and end of each
+                and every variables
+    get_grid - option 1 enable to return grid type and resolution
+    
     collectxml - option 1 gives the xml file name which available inside
                  the least directory
     has_missing_taxis - option 1 enable to just return True or False if the
@@ -252,7 +258,7 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                     # found xml file
                     xmlfile = xmlfile[0]
                     xmlTimeAxis = None
-                    if has_missing_taxis:
+                    if get_taxis or get_grid or has_missing_taxis:
                         # get the time axis of the varname from the xml file
                         try:
                             f = cdms2.open(os.path.join(root, xmlfile))
@@ -267,18 +273,48 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                             raise ValueError("varName '%s' not available.It could be Ensemble. \
                              Kindly add this into the projectdatatypes.py" % varname)
                         xmlTimeAxis = f[varname].getTime()
+                        grid = f[varname].getGrid()
                         f.close()
                     # end of if has_missing_taxis:
+                    extrainfo = {} 
+                    extrainfo['xmlfile'] =  xmlfile
+                    if get_taxis:
+                        # get start and end time 
+                        ct = xmlTimeAxis.asComponentTime()              
+                        sd = str(ct[0]).split(' ')[0]
+                        ed = str(ct[-1]).split(' ')[0]
+                        extrainfo['taxis'] = '(%s to %s)' % (sd, ed)
+                    # end of if get_taxis:
+                    
+                    if get_grid:
+                        gstr = grid.__str__()
+                        if '\n' in gstr:
+                            # Got generic grid. 
+                            gtype = gstr.split('\n')[1].split(': ')[1].capitalize()
+                            # So get lat, lon resolution also.
+                            lat = grid.getLatitude()
+                            lon = grid.getLongitude()
+                            latshp = str(abs(lat[0] - lat[1]))[:4]
+                            lonshp = str(abs(lon[0] - lon[1]))[:4]
+                            gtype += ', (%s°x%s°)' % (latshp, lonshp)
+                        elif '<' in gstr:
+                            # Got curvilinear grid 
+                            gtype = gstr.split(',')[0].split('<')[1]
+                        else:
+                            gtype = ''
+                        extrainfo['grid'] = gtype
+                    # end of if get_grid:
+                        
                     if has_missing_taxis and get_missing_taxis:
                         # get the missing time slice value as component time
                         # string.
                         if len(xmlTimeAxis) == 1:
                             print root, xmlfile
                         get_miss = timobj.has_missing(xmlTimeAxis,
-                                         deepsearch=1, missingYears=1)
+                              deepsearch=1, missingYears=1, missingMonths=1)
                         # assign the current directory size & (xmlfile name &
                         # missing time slice of xml time axis)
-                        leastValue = (dirsize, (xmlfile, get_miss))
+                        extrainfo['missingValue'] = get_miss
                     elif has_missing_taxis:
                         # get the boolean value of either time axis has
                         # missing time slice or not
@@ -287,16 +323,16 @@ def getDictOfProjDataStruct(project, datapath, skipdirs=['Annual'],
                         # assign the current directory size & (xmlfile name &
                         # boolean flag value either xml time series has
                         # missing time slice or not.
-                        leastValue = (dirsize, (xmlfile, has_miss))
+                        extrainfo['has_missing'] = has_miss
                     else:
-                        # assign the current directory size & xmlfile name
-                        leastValue = (dirsize, xmlfile)
+                        pass
                     # end of if has_missing_taxis and get_missing_taxis:
+                    leastValue = (dirsize, extrainfo)
                 else:
                     # xmlfile is not found. so make it as None
-                    # assign the current directory size & None (because
+                    # assign the current directory size & {} (because
                     # No xml file found in the current directory)
-                    leastValue = (dirsize, None)
+                    leastValue = (dirsize, {})
             # end of if collectxml:
             # assign the variable name as key & dirsize as value
             # in 6th-level dictionary in tdic.
@@ -318,6 +354,7 @@ def genHtmlHeader(project='', location='', csspath="css/data.css", js='js/data.j
     html = HTML('html')
     head = html.head()
     title = head.title('Data Status')
+    meta = head.meta(charset="utf-8")  
     css = head.link(rel="stylesheet", type="text/css", href=csspath)
     if js:
         js = head.script(type="text/javascript", src=js)
@@ -344,8 +381,9 @@ def genHtmlHeader(project='', location='', csspath="css/data.css", js='js/data.j
 
 
 def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic, 
-                varSizeDic, latestPath, archiveDir, xmlNotExistsWarning=0, 
-                        xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
+                 varSizeDic, latestPath, archiveDir, showXmlTAxis=0, 
+                               showVarGrid=0, xmlNotExistsWarning=0, 
+                     xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
     """
 
 
@@ -515,57 +553,74 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
                     r.td(ensemble)
                     for realm in avlrealms:
                         for varname in expvardic[realm]:
-                            myCls = ''
-                            myTitle = ''
-                            xmlfile = True
+                            myCls = 'tooltip'
+                            toolTxt = ''
+                            taxis = ''
+                            grid = ''
+                            xmlfile = None
                             missing = False
                             missingValue = None
-
+                                                        
                             realmdic = ensembles[ensemble].get(realm)
                             size = realmdic.get(varname, 'to do') if realmdic else 'to do'
-
+                            
                             if isinstance(size, tuple):
-                                # split the size and xmlfile from tuple
-                                size, xmlfile = size
-                                if isinstance(xmlfile, tuple):
-                                    xmlfile, missing = xmlfile
-                                    if isinstance(missing, tuple):
-                                        missing, missingValue = missing
-                                    # end of if isinstance(missing, tuple):
-                                # end of if isinstance(xmlfile, tuple):
-                            # end of if isinstance(size, tuple):
+                                # split the size and otherinfo from tuple
+                                size, otherinfo = size
+                                # get needed info from otherinfo 
+                                xmlfile = otherinfo.get('xmlfile', None)
+                                taxis = otherinfo.get('taxis', '')
+                                grid = otherinfo.get('grid', '')
+                                missing = otherinfo.get('has_missing', '')
+                                missingValue = otherinfo.get('missingValue', '')
+                            # end of if isinstance(size, tuple):                                          
+                            
+                            toolTxt += varname + ', '
+                            
+                            if showVarGrid and grid:
+                                toolTxt += grid 
+                            # end of if showVarGrid and grid:
+                            
+                            if showXmlTAxis and taxis:
+                                if toolTxt: toolTxt += ', '
+                                toolTxt += 'Avl Time : ' + taxis
+                            # end of if showXmlTAxis and taxis:
 
-                            if xmlNotExistsWarning:
-                                if xmlTAxisMissingWaring:
-                                    myCls = 'xmlTAxisMissingWaringCls' if missing else ''
-                                    myTitle = 'Xmlfile taxis has missing time slice'
-                                else:
-                                    myCls = 'xmlNotExistsWarningCls' if not xmlfile else ''
-                                    myTitle = 'No Xmlfile found'
-                                # end of if xmlTAxisMissingWaring:
-                            # end of if xmlNotExistsWarning:
-
-                            if (xmlTAxisMissingWaring and showXmlTAxisMissing
-                                                            and missingValue):
-                                missingValueStr = 'Missing Time Slice : '
-                                missingValue = str(missingValue)
-                                missingValue = missingValue.split('[')[1]
-                                missingValue = missingValue.split(']')[0]
-                                missingValueStr += missingValue
-                                myTitle = missingValueStr
-                            # end of if (xmlTAxisMissingWaring and
-                            #         showXmlTAxisMissing and missingValue):
-
+                            if xmlTAxisMissingWaring and missingValue:
+                                myCls = 'xmlTAxisMissingWaringCls'
+                                if toolTxt: toolTxt += ', '
+                                if showXmlTAxisMissing:
+                                    misStr = 'Missing Time : '
+                                    missingValues = ''                               
+                                    for msv in missingValue[1]:
+                                        if missingValues: missingValues += ', '
+                                        if len(msv) == 1:
+                                            missingValues += '(%d)' % msv
+                                        elif len(msv) == 2:
+                                            missingValues += '(%d to %d)' % msv
+                                    # end of for msv in missingValue[1]:
+                                    toolTxt += misStr + missingValues                                 
+                                elif not showXmlTAxisMissing:
+                                    toolTxt += 'Xmlfile taxis has missing time slice'       
+                            # end of if xmlTAxisMissingWaring and ...:
+                            
+                            if xmlNotExistsWarning and not xmlfile:
+                                myCls = 'xmlNotExistsWarningCls'
+                                toolTxt = 'Problem in cdcsan'
+                            # end of if xmlNotExistsWarning:                     
+                            
                             if size == '0 B':
                                 myCls = 'zeroByteWarningCls'
-                                myTitle = 'Zero Byte Files'
+                                toolTxt = 'Zero Byte File'
                             # end of if size == '0 B':
-
-                            if myCls:
-                                r.td(size, klass=myCls, title=myTitle)
+                            
+                            if size == 'to do':
+                                r.td(size) 
+                            elif myCls:
+                                r.td(size, klass=myCls+' tooltip', tooltxt=toolTxt)                     
                             else:
-                                r.td(size)
-                            # end of if myCls and myTitle:
+                                r.td(size, klass='tooltip', tooltxt=toolTxt)  
+                            # end of if myCls:  
                         # end of for varname in expvardic[realm]:
                     # end of for realm in expvardic:
                     totTitle = model + ' ' + ensemble + ' Total Size'
@@ -579,11 +634,11 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
                         esize = str(round(esize_no, 2))
                         if esize.endswith('.0'): esize = esize.split('.0')[0]     
                         esize += ' ' + suffix + 'B'                        
-                        r.td(esize, klass='ensembleTotal', title=totTitle)
+                        r.td(esize, klass='ensembleTotal tooltip', tooltxt=totTitle)
                     else:
                         # why ensemble comes in models when really not 
                         # present there ???
-                        r.td('0 KB', klass='zeroByteWarningCls', title=totTitle)
+                        r.td('0 KB', klass='zeroByteWarningCls tooltip', tooltxt=totTitle)
                     # end of if ensemble in ensSizeDic[...]:
                     
                     # adding empty cell for same model but different ensemble
@@ -619,7 +674,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
                     vsize += ' ' + suffix + 'B'
                     # add variable full size over all models
                     myTitle = varname + ' Total Size'
-                    r.td(vsize, klass='variableTotal', title=myTitle)
+                    r.td(vsize, klass='variableTotal tooltip', tooltxt=myTitle)
                 # end of for varname in expvardic[realm]:
             # end of for realm in avlrealms:
             
@@ -631,7 +686,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
             if GrandTotal.endswith('.0'): GrandTotal = GrandTotal.split('.0')[0]
             GrandTotal += ' ' + suffix + 'B'
             gtitle = 'GrandTotal of ' + experiment
-            r.td(GrandTotal, klass='GrandTotal', title=gtitle)
+            r.td(GrandTotal, klass='GrandTotal tooltip', tooltxt=gtitle)
         # end of for frequency in frequencies:
         
         # add the footer to the project page
@@ -661,7 +716,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
         
         # add experiment's GrandTotal into index page at last column
         gTitle = ' '.join([project, experiment, frequency, 'Total Size'])
-        idx_r.td(GrandTotal, klass='ensembleTotal', title=gTitle)
+        idx_r.td(GrandTotal, klass='ensembleTotal tooltip', tooltxt=gTitle)
         # find index grand total 
         if not IdxGrandTotal:
             IdxGrandTotal = GrandTotal
@@ -680,7 +735,7 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
     idx_lr = idx_t.tr(klass=idx_rcls)
     idx_lr.td('Grand Total Size', colspan="4", klass='varTotalSize')
     igtitle = 'GrandTotal of ' + project
-    idx_lr.td(IdxGrandTotal, klass='GrandTotal', title=igtitle)
+    idx_lr.td(IdxGrandTotal, klass='GrandTotal tooltip', tooltxt=igtitle)
 
     foot = idx_form.div(id='footDiv')
     footp = foot.p(id='crdate', name=latestdirctime)
@@ -711,8 +766,9 @@ def genHtmlProjectTable(project, location, tdic, vardic, ensSizeDic,
 # end of def genHtmlProjectTable(project, ...):
 
 
-def main(datapath, outpath, project='CMIP5', location='', cdscanWarning=0,
-                            xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
+def main(datapath, outpath, project='CMIP5', location='', showXmlTAxis=0, 
+                                          showVarGrid=0, cdscanWarning=0, 
+                          xmlTAxisMissingWaring=0, showXmlTAxisMissing=0):
 
     outpath = os.path.join(outpath, 'CMIPs_Data_Status_Report')
     latestPath = os.path.join(outpath, 'latest')
@@ -720,7 +776,9 @@ def main(datapath, outpath, project='CMIP5', location='', cdscanWarning=0,
     print "Be hold ...!"
     # get the both available dataset structure & available vardic as dictionary
     tableDic, varDic, ensSizeDic, varSizeDic = getDictOfProjDataStruct(project, 
-                                        datapath, collectxml=cdscanWarning,
+                                        datapath, get_taxis=showXmlTAxis,
+                                        get_grid=showVarGrid,
+                                        collectxml=cdscanWarning,
                                    has_missing_taxis=xmlTAxisMissingWaring,
                                      get_missing_taxis=showXmlTAxisMissing)
     
@@ -742,8 +800,9 @@ def main(datapath, outpath, project='CMIP5', location='', cdscanWarning=0,
 
     # generate the index & sub html pages and write it into proper directory
     genHtmlProjectTable(project, location, tableDic, varDic, ensSizeDic,
-                          varSizeDic, latestPath, htmlcrdate, cdscanWarning, 
-                               xmlTAxisMissingWaring, showXmlTAxisMissing)
+                                     varSizeDic, latestPath, htmlcrdate, 
+                               showXmlTAxis, showVarGrid, cdscanWarning, 
+                             xmlTAxisMissingWaring, showXmlTAxisMissing)
 
     for folder in os.listdir(outpath):
         if folder in ['latest', htmlcrdate]:
@@ -775,18 +834,16 @@ if __name__ == '__main__':
     
     location = raw_input("Enter the location name [CAS, IITD] : ") 
     project = raw_input("Enter the project name [CMIP5] : ")
-    #datapath = raw_input("Enter the source project path : ")
-    # Since this script is in server, it should know the source path !
-    datapath = os.path.abspath('../../CMIPs/') 
-    print "The obtained data path is '%s'" % datapath
-    
-    #outpath = raw_input("Enter the outpath : ")
-    outpath = os.path.abspath('../../')
+    datapath = raw_input("Enter the source project path : ")    
+    print "The obtained data path is '%s'" % datapath   
+    outpath = raw_input("Enter the html tables outpath : ")
     print "The index.html path will be ", outpath
     
+    timeaxis = raw_input("Do you want to show 'start-end years' of xml [Y/n] : ")
+    gridinfo = raw_input("Do you want to show 'grid type' of data variable [Y/n] : ")
     cdwarn = raw_input("Do you want to enable cdscan warning [Y/n] : ")
     missing = raw_input("Do you want to enable xml time axis missing time slice warning [Y/n] : ")
-
+    
     if project in ['CMIP5', '']:
         project = 'CMIP5'
     # end of if project in ['CMIP5', '']:
@@ -799,6 +856,20 @@ if __name__ == '__main__':
         outpath = os.path.abspath(os.curdir)
     # end of if outpath in ['', None]:
 
+    if timeaxis in ['', 'y', 'Y', 'yes']:
+        # default enter takes 'yes'
+        get_timeaxis = True
+    else:
+        get_timeaxis = False
+    # end of if timeaxis in ['', 'y', 'Y', 'yes']:
+    
+    if gridinfo in ['', 'y', 'Y', 'yes']:
+        # default enter takes 'yes'
+        get_gridinfo = True
+    else:
+        get_gridinfo = False
+    # end of if gridinfo in ['', 'y', 'Y', 'yes']:
+    
     if cdwarn in ['', 'y', 'Y', 'yes']:
         # default enter takes 'yes'
         cdwarn = True
@@ -828,8 +899,8 @@ if __name__ == '__main__':
     # end of if missing in ['y', 'Y', 'yes']:
 
     # call the main function
-    main(datapath, outpath, project, location, cdscanWarning=cdwarn,
+    main(datapath, outpath, project, location, showXmlTAxis=get_timeaxis, 
+         showVarGrid=get_gridinfo, cdscanWarning=cdwarn,
          xmlTAxisMissingWaring=missing, showXmlTAxisMissing=get_missing)
 
 # end of if __name__ == '__main__':
-
