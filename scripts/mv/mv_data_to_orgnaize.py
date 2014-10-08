@@ -84,13 +84,13 @@ def moveFiles2ProperDir(project, inpath, outpath=None, action='move', overwrite=
     mv2samepath = False
     tmpdir = ''
 
-    if outpath in [None, '']:
+    if outpath in [None, '', inpath]:
 
         if action == 'move':
-            useragree = raw_input("Outpath is None. So Shall we  move the files in the same \
+            useragree = raw_input("Outpath is None or same as inpath. So Shall we  move the files in the same \
                input path '%s' itself to organize the directory structure [yes/no] ?" % inpath)
         elif action == 'copy':
-            useragree = raw_input("Outpath is None. So you can not copy the files in to the same \
+            useragree = raw_input("Outpath is None or same as inpath. So you can not copy the files in to the same \
                input path itself to organize the directory structure. Would you like to move files \
                into the same inpath [yes/no] ?")
         # end of if action == 'move':
@@ -177,9 +177,9 @@ def moveFiles2ProperDir(project, inpath, outpath=None, action='move', overwrite=
                         shutil.move(srcpath, destpath)
                         print srcpath, ' is moved to ', destpath
                         fobj.write(srcpath + ', is moved to ,' + destpath + '\n')
-                except:
+                except Exception, e:
                     raise RuntimeError("An error occured while copying file \
-                        from %s to %s" % (srcpath, destpath))
+                        from %s to %s, error '%s'" % (srcpath, destpath, str(e)))
                 # end of try:
             # end of for bfile in bfiles:
         # end of if files:
@@ -215,9 +215,7 @@ if __name__ == '__main__':
         project = 'CMIP5'
     srcpath = raw_input("Enter the source path : ")
 
-    #destpath = raw_input("Enter the destination path : ")
-    # Since this script is in server, it should know the destination path !
-    destpath = os.path.abspath('../../CMIPs/')
+    destpath = raw_input("Enter the destination path : ")    
     print "The destination path is '%s'" % destpath
 
     action = raw_input("Enter the action [copy/move] : ")
