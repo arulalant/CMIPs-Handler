@@ -2,8 +2,8 @@ import os, re, datetime
 from subprocess import Popen, PIPE
 
 
-cdscan = '/home/dileep/UV-CDAT_Versions/uv1_2/install/bin/cdscan'
 __OVERWRITE = 0
+
 
 def isModifiedToday(path):
     # get the last modified timestamp of folder/file as seconds
@@ -171,18 +171,16 @@ print cdscan
 cdscan = os.path.join(cdscan, 'cdscan')
 print "Your cdscan cmd path is ", cdscan
 
-#datapath = raw_input("Enter the source data path : ")
-# Since this script is in server, it should know the source path !
-datapath = os.path.abspath('../../CMIPs/')
+datapath = raw_input("Enter the source data path : ")
 print "The source data path is '%s'" % datapath
 
-#outpath = raw_input("Enter the log path : ")
+outpath = raw_input("Enter the log path : ")
 d = datetime.date.today()
 logdir = d.isoformat()
-outpath = os.path.abspath('../../cdlogs/%s' % logdir)
+outpath = os.path.abspath('%s/cdlogs/%s' % (outpath,logdir))
 
 if not os.path.isdir(outpath):
-    os.mkdir(outpath)
+    os.makedirs(outpath)
 # end of if not os.path.isdir(outpath):
 
 print "The cdscan log path is '%s'" % outpath
