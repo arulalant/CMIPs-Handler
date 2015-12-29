@@ -5,19 +5,19 @@ from subprocess import Popen, PIPE
 __OVERWRITE = 0
 
 
-def isModifiedToday(path):
+def isModifiedWithinLagDays(path, lag):
     # get the last modified timestamp of folder/file as seconds
     mod_sec = os.path.getmtime(path)
     mod_date = datetime.datetime.fromtimestamp(mod_sec).date()
 
-    if mod_date.toordinal() == mod_date.today().toordinal():
-        # folder/file is modified by today  
+    if (mod_date.today().toordinal() - mod_date.toordinal()) <= lag:
+        # folder/file is modified within past lag days. 
         return True
     else:
-        # The folder/file is not modified by today
+        # The folder/file is not modified within past lag days
         return False
     # end of if mod_date.toordinal() == mod_date.today().toordinal():
-# end of def isModifiedToday(path):
+# end of def isModifiedWithinLagDays(path):
 
 
 def doCdscan(datapath, extension='nc', logpath=None, **kwarg):
@@ -30,8 +30,9 @@ def doCdscan(datapath, extension='nc', logpath=None, **kwarg):
     """
 
     xmlfile = kwarg.get('xmlfile', None)
-    modifiedToday = kwarg.get('modifiedToday', False)
+    modifiedLagDaysFlag = kwarg.get('modifiedLagDaysFlag', False)
     skipdirs = kwarg.get('skipdirs', ['Annual'])
+    lagdays = kwarg.get('lagdays', 0)
     
     if not xmlfile:
         fsplit = ''
@@ -77,19 +78,20 @@ def doCdscan(datapath, extension='nc', logpath=None, **kwarg):
         # end of for skipdir in skipdirs:
         
         if files:
-            if (modifiedToday and not isModifiedToday(root)):
-                print "The path %s is not modified today, \
-                        so skip it without doing cdscan" % root
-                warningfile.write("The path %s is not modified today, \
-                                so skip it without doing cdscan" % root)
+            if (modifiedLagDaysFlag and not isModifiedWithinLagDays(root, lagdays)):
+                msg = "The path %s is not modified with in past %d days, \
+                        so skip it without doing cdscan" % (root, lagdays)
+                print msg
+                warningfile.write(msg)
                 continue            
-            # end of if (modifiedToday and ...):
+            # end of if (modifiedLagDaysFlag and ...):
 
             if xmlfile:
                 outfile = xmlfile
                 fname = xmlfile.split('.xml')[0]
             else:
                 files = [f for f in files if f.endswith('.'+extension)]
+                if not files: continue
                 if fsplit:
                     # split the file by user defined
                     fname = files[0].split(fsplit)
@@ -185,15 +187,16 @@ if not os.path.isdir(outpath):
 
 print "The cdscan log path is '%s'" % outpath
 
-modifiedTodayInput = raw_input("Do you want to do cdscan only for \
-                  the directories which is modified today [N/y] : ").strip()
+modifiedLagDaysFlag = raw_input("Do you want to do cdscan only for \
+                  the directories which is modified in past few days [N/y] : ").strip()
 
-if modifiedTodayInput in ['y', 'Y', 'yes']:
-    modifiedTodayInput = True
+if modifiedLagDaysFlag in ['y', 'Y', 'yes']:
+    modifiedLagDaysFlag = True
     __OVERWRITE = True
+    modifiedLagDays = int(raw_input("Enter the no of past days [Default : 0] : ").strip())
 else:
-    modifiedTodayInput = False
-# end of if modifiedTodayInput in ['y', 'Y', 'yes']:
+    modifiedLagDaysFlag = False
+# end of if modifiedLagDaysFlag in ['y', 'Y', 'yes']:
 
 missingXmlInput = raw_input("Do you want to do cdscan only for \
                   the directories which is not having xml [N/y] : ").strip()
@@ -209,6 +212,7 @@ if not __OVERWRITE:
 # end of if __OVERWRITE == False:      
 
 doCdscan(datapath, extension='nc', logpath=outpath, fsplit='_',
-  fjoin='_', flen=5, skipdirs=['Annual'], modifiedToday=modifiedTodayInput)
+                         fjoin='_', flen=5, skipdirs=['Annual'], 
+  modifiedLagDaysFlag=modifiedLagDaysFlag, lagdays=modifiedLagDays)
 
 
