@@ -28,26 +28,31 @@ def createProjectList(datapath, project='CMIP5'):
     all_ensembles = []
 
     for model in all_models:
+        if model.startswith('.'): continue
         modelpath = os.path.join(projpath, model)
         experiments = os.listdir(modelpath)
         all_experiments += experiments
 
         for experiment in experiments:
+            if experiment.startswith('.'): continue
             exppath = os.path.join(modelpath, experiment)
             freqs = os.listdir(exppath)
             all_frequencies += freqs
 
             for freq in freqs:
+                if freq.startswith('.'): continue
                 freqpath = os.path.join(exppath, freq)
                 realms = os.listdir(freqpath)
                 all_realms += realms
 
                 for realm in realms:
+                    if realm.startswith('.'): continue
                     realmpath = os.path.join(freqpath, realm)
                     variables = os.listdir(realmpath)
                     all_vars += variables
 
                     for var in variables:
+                        if var.startswith('.'): continue
                         varpath = os.path.join(realmpath, var)
                         ensembles = os.listdir(varpath)
                         all_ensembles += ensembles
